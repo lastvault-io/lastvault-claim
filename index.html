@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LastVault — Independent Vault Recovery</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 620px;
+    width: 100%;
+  }
+
+  h1 {
+    text-align: center;
+    color: #C9A84C;
+    font-size: 1.8rem;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+
+  .warning-banner {
+    background: rgba(201, 168, 76, 0.12);
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    color: #C9A84C;
+    line-height: 1.5;
+  }
+
+  .warning-banner strong { display: block; margin-bottom: 4px; font-size: 0.9rem; }
+
+  .card {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card h2 {
+    color: #C9A84C;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  label {
+    display: block;
+    font-size: 0.82rem;
+    color: #999;
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+
+  label:first-of-type { margin-top: 0; }
+
+  input, select {
+    width: 100%;
+    padding: 10px 14px;
+    background: #0a0a0f;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus {
+    border-color: #C9A84C;
+  }
+
+  input::placeholder { color: #444; }
+
+  select { cursor: pointer; }
+  select option { background: #12121a; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    margin-top: 20px;
+    background: #C9A84C;
+    color: #0a0a0f;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn:hover { background: #d4b45e; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status-log {
+    margin-top: 16px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: #888;
+  }
+
+  .status-log .step { padding-left: 4px; }
+  .status-log .step::before { content: ''; margin-right: 6px; }
+  .status-log .ok { color: #4caf84; }
+  .status-log .ok::before { content: '\2713'; }
+  .status-log .working { color: #C9A84C; }
+  .status-log .working::before { content: '\2026'; }
+  .status-log .err { color: #e05555; }
+  .status-log .err::before { content: '\2717'; }
+
+  .result-box {
+    display: none;
+    margin-top: 20px;
+    background: rgba(76, 175, 132, 0.08);
+    border: 1px solid rgba(76, 175, 132, 0.3);
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .result-box h3 {
+    color: #4caf84;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+  }
+
+  .key-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .key-display code {
+    flex: 1;
+    display: block;
+    background: #0a0a0f;
+    border: 1px solid #2a2a3a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    word-break: break-all;
+    color: #4caf84;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+
+  .copy-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    background: #1e1e2e;
+    border: 1px solid #2a2a3a;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .copy-btn:hover { background: #2a2a3a; }
+
+  .contract-status {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .contract-status h3 {
+    color: #C9A84C;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .status-cell {
+    background: #0a0a0f;
+    border: 1px solid #1e1e2e;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .status-cell .label { font-size: 0.72rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-cell .value { font-size: 0.88rem; color: #e0e0e0; margin-top: 4px; font-family: 'SF Mono', monospace; }
+  .status-cell .value.expired { color: #e05555; }
+  .status-cell .value.active { color: #4caf84; }
+
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    color: #444;
+    font-size: 0.75rem;
+    padding-bottom: 20px;
+  }
+
+  @media (max-width: 500px) {
+    .status-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 1.4rem; }
+    .card { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>LastVault</h1>
+  <p class="subtitle">Independent Vault Recovery Tool</p>
+
+  <div class="warning-banner">
+    <strong>Standalone Recovery</strong>
+    This tool works independently of LastVault servers. It reads your vault directly from the blockchain and decrypts it locally in your browser. No data leaves this page.
+  </div>
+
+  <div class="card">
+    <h2>Vault Recovery</h2>
+
+    <label for="contractAddr">Vault Contract Address</label>
+    <input type="text" id="contractAddr" placeholder="0x..." spellcheck="false" autocomplete="off">
+
+    <label for="privKey">Recovery Key (64 hex characters)</label>
+    <input type="password" id="privKey" placeholder="your secp256k1 private key" spellcheck="false" autocomplete="off">
+
+    <label for="chain">Blockchain Network</label>
+    <select id="chain">
+      <option value="base_mainnet">Base Mainnet</option>
+      <option value="base_sepolia">Base Sepolia (Testnet)</option>
+      <option value="eth_mainnet">Ethereum Mainnet</option>
+    </select>
+
+    <button class="btn" id="claimBtn" onclick="startClaim()">Recover Vault</button>
+
+    <div class="status-log" id="statusLog"></div>
+
+    <div class="contract-status" id="contractStatus">
+      <h3>Contract Status</h3>
+      <div class="status-grid">
+        <div class="status-cell">
+          <div class="label">Last Ping</div>
+          <div class="value" id="lastPing">--</div>
+        </div>
+        <div class="status-cell">
+          <div class="label">Timeout Period</div>
+          <div class="value" id="timeoutPeriod">--</div>
+        </div>
+        <div class="status-cell">
+          <div class="label">Deadline</div>
+          <div class="value" id="deadline">--</div>
+        </div>
+        <div class="status-cell">
+          <div class="label">Status</div>
+          <div class="value" id="vaultStatus">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-box" id="resultBox">
+      <h3>Decrypted Master Key</h3>
+      <div class="key-display">
+        <code id="masterKeyHex"></code>
+        <button class="copy-btn" onclick="copyKey()">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>LastVault Independent Recovery v1.0 — This file has no server dependencies</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script>
+(function() {
+  "use strict";
+
+  var CHAINS = {
+    base_mainnet:  { rpc: "https://mainnet.base.org",   chainId: 8453,  name: "Base Mainnet" },
+    base_sepolia:  { rpc: "https://sepolia.base.org",   chainId: 84532, name: "Base Sepolia" },
+    eth_mainnet:   { rpc: "https://eth.llamarpc.com",   chainId: 1,     name: "Ethereum Mainnet" }
+  };
+
+  var ABI = [
+    "function encryptedPayload() view returns (bytes)",
+    "function encryptedCid() view returns (string)",
+    "function lastPingTimestamp() view returns (uint256)",
+    "function timeoutPeriod() view returns (uint256)"
+  ];
+
+  var IPFS_GATEWAYS = [
+    "https://gateway.pinata.cloud/ipfs/",
+    "https://ipfs.io/ipfs/",
+    "https://cloudflare-ipfs.com/ipfs/",
+    "https://dweb.link/ipfs/"
+  ];
+
+  // Wire format constants
+  var EPHEMERAL_PUBKEY_LEN = 65;
+  var NONCE_LEN = 12;
+  var TAG_LEN = 16;
+  var HEADER_LEN = EPHEMERAL_PUBKEY_LEN + NONCE_LEN + TAG_LEN; // 93
+
+  var logEl = document.getElementById("statusLog");
+  var running = false;
+
+  function log(msg, cls) {
+    var div = document.createElement("div");
+    div.className = "step " + (cls || "working");
+    div.textContent = msg;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearLog() {
+    logEl.innerHTML = "";
+    document.getElementById("resultBox").style.display = "none";
+    document.getElementById("contractStatus").style.display = "none";
+  }
+
+  function hexToBytes(hex) {
+    hex = hex.replace(/^0x/i, "");
+    var bytes = new Uint8Array(hex.length / 2);
+    for (var i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    }
+    return bytes;
+  }
+
+  function bytesToHex(bytes) {
+    return Array.from(bytes).map(function(b) { return b.toString(16).padStart(2, "0"); }).join("");
+  }
+
+  function formatTimestamp(ts) {
+    if (ts === 0) return "Never";
+    return new Date(ts * 1000).toLocaleString();
+  }
+
+  function formatDuration(seconds) {
+    var d = Math.floor(seconds / 86400);
+    var h = Math.floor((seconds % 86400) / 3600);
+    if (d > 0) return d + "d " + h + "h";
+    var m = Math.floor((seconds % 3600) / 60);
+    return h + "h " + m + "m";
+  }
+
+  async function fetchFromIpfs(cid) {
+    for (var i = 0; i < IPFS_GATEWAYS.length; i++) {
+      try {
+        log("Trying IPFS gateway: " + IPFS_GATEWAYS[i].split("/")[2], "working");
+        var resp = await fetch(IPFS_GATEWAYS[i] + cid, { signal: AbortSignal.timeout(15000) });
+        if (!resp.ok) continue;
+        var buf = await resp.arrayBuffer();
+        log("Fetched " + buf.byteLength + " bytes from IPFS", "ok");
+        return new Uint8Array(buf);
+      } catch (e) { /* try next */ }
+    }
+    throw new Error("Could not fetch CID from any IPFS gateway: " + cid);
+  }
+
+  /**
+   * ECDH using ethers.SigningKey, returns 32-byte shared secret (X coordinate).
+   */
+  function computeSharedSecret(heirPrivKeyHex, ephemeralPubKeyBytes) {
+    var sk = new ethers.SigningKey("0x" + heirPrivKeyHex);
+    // computeSharedSecret returns 0x + 33-byte compressed point (prefix + X)
+    var sharedPoint = sk.computeSharedSecret("0x" + bytesToHex(ephemeralPubKeyBytes));
+    // sharedPoint is "0x04..." (uncompressed) or "0x02/03..." — ethers v6 returns uncompressed 65-byte
+    // We need the X coordinate: bytes 1..32 of the uncompressed point
+    var pointBytes = hexToBytes(sharedPoint);
+    if (pointBytes.length === 65 && pointBytes[0] === 0x04) {
+      return pointBytes.slice(1, 33);
+    }
+    if (pointBytes.length === 33) {
+      return pointBytes.slice(1, 33);
+    }
+    // Fallback: take first 32 bytes if unexpected format
+    return pointBytes.slice(0, 32);
+  }
+
+  /**
+   * HKDF-SHA256 using Web Crypto API.
+   * salt=null -> zero-filled salt of hash length (32 bytes for SHA-256), matching .NET HKDF behavior.
+   */
+  async function hkdfDerive(sharedSecret, infoStr) {
+    var enc = new TextEncoder();
+    var infoBytes = enc.encode(infoStr);
+    // Zero salt (32 bytes) to match .NET HKDF.DeriveKey(salt: null)
+    var salt = new Uint8Array(32);
+
+    var ikm = await crypto.subtle.importKey(
+      "raw", sharedSecret, { name: "HKDF" }, false, ["deriveBits"]
+    );
+
+    var derived = await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt: salt, info: infoBytes },
+      ikm, 256
+    );
+
+    return new Uint8Array(derived);
+  }
+
+  /**
+   * AES-256-GCM decrypt using Web Crypto API.
+   * Note: Web Crypto expects the tag appended to the ciphertext.
+   */
+  async function aesGcmDecrypt(ciphertext, tag, nonce, aesKeyBytes) {
+    var key = await crypto.subtle.importKey(
+      "raw", aesKeyBytes, { name: "AES-GCM" }, false, ["decrypt"]
+    );
+
+    // Web Crypto expects ciphertext || tag
+    var combined = new Uint8Array(ciphertext.length + tag.length);
+    combined.set(ciphertext, 0);
+    combined.set(tag, ciphertext.length);
+
+    var plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: nonce, tagLength: 128 },
+      key, combined
+    );
+
+    return new Uint8Array(plaintext);
+  }
+
+  /**
+   * Full ECIES decryption matching EciesService.cs
+   */
+  async function eciesDecrypt(bundle, heirPrivKeyHex) {
+    if (bundle.length <= HEADER_LEN) {
+      throw new Error("Encrypted bundle too short (" + bundle.length + " bytes, minimum " + (HEADER_LEN + 1) + ")");
+    }
+
+    // 1. Parse bundle
+    var ephemeralPubKey = bundle.slice(0, EPHEMERAL_PUBKEY_LEN);
+    var nonce = bundle.slice(EPHEMERAL_PUBKEY_LEN, EPHEMERAL_PUBKEY_LEN + NONCE_LEN);
+    var tag = bundle.slice(EPHEMERAL_PUBKEY_LEN + NONCE_LEN, HEADER_LEN);
+    var ciphertext = bundle.slice(HEADER_LEN);
+
+    log("Bundle: " + ephemeralPubKey.length + "B pubkey, " + nonce.length + "B nonce, " + tag.length + "B tag, " + ciphertext.length + "B ciphertext", "ok");
+
+    // 2. ECDH
+    log("Computing ECDH shared secret...", "working");
+    var sharedSecret = computeSharedSecret(heirPrivKeyHex, ephemeralPubKey);
+
+    // 3. HKDF
+    log("Deriving AES key via HKDF-SHA256...", "working");
+    var aesKey = await hkdfDerive(sharedSecret, "AFTERKEY_ECIES_V1");
+
+    // 4. AES-GCM decrypt
+    log("Decrypting with AES-256-GCM...", "working");
+    var plaintext = await aesGcmDecrypt(ciphertext, tag, nonce, aesKey);
+
+    // Zero out sensitive data
+    sharedSecret.fill(0);
+    aesKey.fill(0);
+
+    return plaintext;
+  }
+
+  async function startClaim() {
+    if (running) return;
+    running = true;
+    var btn = document.getElementById("claimBtn");
+    btn.disabled = true;
+    btn.textContent = "Recovering...";
+    clearLog();
+
+    try {
+      var contractAddr = document.getElementById("contractAddr").value.trim();
+      var privKeyRaw = document.getElementById("privKey").value.trim();
+      var chainKey = document.getElementById("chain").value;
+
+      // Validate inputs
+      if (!contractAddr || !ethers.isAddress(contractAddr)) {
+        throw new Error("Please enter a valid Ethereum contract address.");
+      }
+
+      var privKey = privKeyRaw.replace(/^0x/i, "");
+      if (!/^[0-9a-fA-F]{64}$/.test(privKey)) {
+        throw new Error("Recovery key must be exactly 64 hex characters (32 bytes). Do not include the 0x prefix unless it is 66 chars total.");
+      }
+
+      var chain = CHAINS[chainKey];
+      log("Connecting to " + chain.name + "...", "working");
+
+      var provider = new ethers.JsonRpcProvider(chain.rpc, chain.chainId);
+      var contract = new ethers.Contract(contractAddr, ABI, provider);
+
+      // Read contract status
+      log("Reading contract status...", "working");
+      var statusEl = document.getElementById("contractStatus");
+      try {
+        var lastPing = await contract.lastPingTimestamp();
+        var timeout = await contract.timeoutPeriod();
+        var lastPingNum = Number(lastPing);
+        var timeoutNum = Number(timeout);
+        var deadlineTs = lastPingNum + timeoutNum;
+        var now = Math.floor(Date.now() / 1000);
+        var remaining = deadlineTs - now;
+
+        document.getElementById("lastPing").textContent = formatTimestamp(lastPingNum);
+        document.getElementById("timeoutPeriod").textContent = formatDuration(timeoutNum);
+        document.getElementById("deadline").textContent = formatTimestamp(deadlineTs);
+
+        var statusValEl = document.getElementById("vaultStatus");
+        if (lastPingNum === 0) {
+          statusValEl.textContent = "No ping recorded";
+          statusValEl.className = "value";
+        } else if (remaining <= 0) {
+          statusValEl.textContent = "CLAIMABLE (expired " + formatDuration(Math.abs(remaining)) + " ago)";
+          statusValEl.className = "value expired";
+        } else {
+          statusValEl.textContent = "Locked (" + formatDuration(remaining) + " remaining)";
+          statusValEl.className = "value active";
+        }
+
+        statusEl.style.display = "block";
+        log("Contract status loaded", "ok");
+      } catch (e) {
+        log("Could not read contract status (non-critical): " + e.message, "err");
+      }
+
+      // Read encrypted payload
+      log("Reading encryptedPayload from contract...", "working");
+      var bundle = null;
+
+      try {
+        var payloadHex = await contract.encryptedPayload();
+        var payloadBytes = hexToBytes(payloadHex);
+        if (payloadBytes.length > HEADER_LEN) {
+          bundle = payloadBytes;
+          log("Found on-chain payload: " + bundle.length + " bytes", "ok");
+        }
+      } catch (e) {
+        log("encryptedPayload not available: " + e.message, "working");
+      }
+
+      // Fallback to IPFS
+      if (!bundle) {
+        log("On-chain payload empty, trying IPFS fallback...", "working");
+        var cid = await contract.encryptedCid();
+        if (!cid || cid.length === 0) {
+          throw new Error("No encrypted data found on-chain or in IPFS. The vault may not have been deployed yet.");
+        }
+        log("Found CID: " + cid, "ok");
+        bundle = await fetchFromIpfs(cid);
+      }
+
+      // Decrypt
+      log("Decrypting ECIES bundle...", "working");
+      var masterKey = await eciesDecrypt(bundle, privKey);
+      log("Decryption successful!", "ok");
+
+      // Display result
+      var masterKeyHex = bytesToHex(masterKey);
+      document.getElementById("masterKeyHex").textContent = masterKeyHex;
+      document.getElementById("resultBox").style.display = "block";
+
+      log("Master Key recovered (" + masterKey.length + " bytes)", "ok");
+
+    } catch (err) {
+      log("Error: " + err.message, "err");
+    } finally {
+      running = false;
+      btn.disabled = false;
+      btn.textContent = "Recover Vault";
+    }
+  }
+
+  function copyKey() {
+    var keyText = document.getElementById("masterKeyHex").textContent;
+    navigator.clipboard.writeText(keyText).then(function() {
+      var btn = document.querySelector(".copy-btn");
+      btn.textContent = "Copied!";
+      setTimeout(function() { btn.textContent = "Copy"; }, 2000);
+    });
+  }
+
+  // Expose to global scope for onclick handlers
+  window.startClaim = startClaim;
+  window.copyKey = copyKey;
+})();
+</script>
+
+</body>
+</html>
